@@ -56,6 +56,7 @@ class SingleDecodeScheduler(
         task: () -> Unit,
         onQueuedCancellation: () -> Unit,
         onRunningCancellation: () -> Unit,
+        onFinished: () -> Unit = {},
         onQueued: (position: Int) -> Unit = {},
     ): DecodeSubmission {
         check(!closed.get()) { "Decode scheduler is closed" }
@@ -70,6 +71,7 @@ class SingleDecodeScheduler(
             task = task,
             onQueuedCancellation = onQueuedCancellation,
             onRunningCancellation = onRunningCancellation,
+            onFinished = onFinished,
         )
         return try {
             check(works.putIfAbsent(requestId, work) == null) {
@@ -103,8 +105,12 @@ class SingleDecodeScheduler(
 
             queue.remove(work) -> {
                 works.remove(requestId, work)
-                work.notifyQueuedCancellation()
-                work.releaseCapacity(capacity)
+                try {
+                    work.notifyQueuedCancellation()
+                } finally {
+                    work.releaseCapacity(capacity)
+                    work.notifyFinished()
+                }
             }
 
             work.started.get() -> work.onRunningCancellation()
@@ -143,12 +149,17 @@ class SingleDecodeScheduler(
     private fun execute(work: ScheduledWork) {
         if (work.cancelled.get()) {
             works.remove(work.requestId, work)
-            work.notifyQueuedCancellation()
-            work.releaseCapacity(capacity)
+            try {
+                work.notifyQueuedCancellation()
+            } finally {
+                work.releaseCapacity(capacity)
+                work.notifyFinished()
+            }
             return
         }
         if (!work.started.compareAndSet(false, true)) {
             work.releaseCapacity(capacity)
+            work.notifyFinished()
             return
         }
 
@@ -163,6 +174,7 @@ class SingleDecodeScheduler(
             works.remove(work.requestId, work)
             work.releaseCapacity(capacity)
             activeRequest.set(null)
+            work.notifyFinished()
         }
     }
 
@@ -174,12 +186,14 @@ class SingleDecodeScheduler(
         val task: () -> Unit,
         val onQueuedCancellation: () -> Unit,
         val onRunningCancellation: () -> Unit,
+        val onFinished: () -> Unit,
     ) : Comparable<ScheduledWork> {
         val cancelled = AtomicBoolean(false)
         val started = AtomicBoolean(false)
         private val admissionWindow = sequence / fairnessWindow
         private val queuedCancellationNotified = AtomicBoolean(false)
         private val capacityReleased = AtomicBoolean(false)
+        private val finishedNotified = AtomicBoolean(false)
 
         override fun compareTo(other: ScheduledWork): Int {
             val windowComparison = admissionWindow.compareTo(other.admissionWindow)
@@ -197,6 +211,12 @@ class SingleDecodeScheduler(
         fun releaseCapacity(capacity: Semaphore) {
             if (capacityReleased.compareAndSet(false, true)) {
                 capacity.release()
+            }
+        }
+
+        fun notifyFinished() {
+            if (finishedNotified.compareAndSet(false, true)) {
+                runCatching { onFinished() }
             }
         }
     }

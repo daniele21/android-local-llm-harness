@@ -189,6 +189,7 @@ class RuntimeOrchestrator(
                     lifecycle.requestCancellation()
                     runCatching { backend.cancel(request.requestId.value) }
                 },
+                onFinished = lifecycle::schedulerFinished,
                 onQueued = { position ->
                     runtimeTelemetry.queuedPosition(request.requestId, position)
                     lifecycle.emit(GenerationEvent.Queued(request.requestId, position))
@@ -198,6 +199,7 @@ class RuntimeOrchestrator(
             val failure = LocalLlmError.Configuration(error.message ?: "Unable to schedule generation")
             runtimeTelemetry.failed(request.requestId, failure)
             lifecycle.finish(GenerationEvent.Failed(request.requestId, failure))
+            lifecycle.schedulerFinished()
             return NoOpGenerationHandle(request.requestId)
         }
 
@@ -1407,6 +1409,9 @@ private class GenerationCancelledException : RuntimeException()
 
 private class RequestLifecycle(val requestId: RequestId, private val listener: GenerationListener, private val onTerminal: () -> Unit) {
     private val generationLifecycle = GenerationLifecycle()
+    private val schedulerFinished = AtomicBoolean(false)
+    private val terminalEvent = AtomicReference<GenerationEvent?>(null)
+    private val terminalDelivered = AtomicBoolean(false)
 
     fun requestCancellation(): Boolean = generationLifecycle.requestCancellation()
 
@@ -1427,8 +1432,22 @@ private class RequestLifecycle(val requestId: RequestId, private val listener: G
             return
         }
         val release = runCatching { onTerminal() }
-        runCatching { listener.onEvent(event) }
+        terminalEvent.set(event)
+        deliverTerminalIfReady()
         release.getOrThrow()
+    }
+
+    fun schedulerFinished() {
+        schedulerFinished.set(true)
+        deliverTerminalIfReady()
+    }
+
+    private fun deliverTerminalIfReady() {
+        if (!schedulerFinished.get()) return
+        val event = terminalEvent.get() ?: return
+        if (terminalDelivered.compareAndSet(false, true)) {
+            runCatching { listener.onEvent(event) }
+        }
     }
 }
 
