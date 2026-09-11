@@ -73,6 +73,31 @@ class RuntimeSessionLifecycleIntegrationTest {
     }
 
     @Test
+    fun `terminal callback can close its session after request ownership is drained`() {
+        val backend = DeterministicFakeInferenceBackend()
+        val fixture = RuntimeSessionLifecycleFixture(backend)
+        val session = fixture.runtime.createSession(fixture.applicationId, fixture.useCaseId)
+        val terminal = CountDownLatch(1)
+        var activeSessionsAtTerminal = -1
+
+        fixture.runtime.generate(
+            fixture.request("terminal-close", session),
+            GenerationListener { event ->
+                if (event is GenerationEvent.Completed || event is GenerationEvent.Failed) {
+                    fixture.runtime.closeSession(session)
+                    activeSessionsAtTerminal = fixture.runtime.runtimeSnapshot().activeSessions
+                    terminal.countDown()
+                }
+            },
+        )
+
+        assertTrue(terminal.await(2, TimeUnit.SECONDS))
+        assertEquals(0, activeSessionsAtTerminal)
+        assertEquals(1, backend.releaseContextCalls)
+        fixture.close()
+    }
+
+    @Test
     fun `failed physical release rolls lifecycle back and a repeated close retries cleanup`() {
         val delegate = DeterministicFakeInferenceBackend()
         val backend = ReleaseFailOnceBackend(delegate)
