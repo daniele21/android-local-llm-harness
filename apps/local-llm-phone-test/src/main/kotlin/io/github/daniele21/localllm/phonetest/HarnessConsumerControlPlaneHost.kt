@@ -226,6 +226,7 @@ internal class HarnessConsumerControlPlaneHost(
                 useCaseId = request.useCaseId,
                 preset = request.preset,
                 modelDigest = execution.modelDigest,
+                modelProfileId = execution.modelProfileId,
                 acquiredAtEpochMs = epochClock(),
                 useCaseRevision = execution.useCaseRevision,
                 bindingRevision = execution.bindingRevision,
@@ -368,7 +369,7 @@ private fun HostExecutionFailureCode.toConsumerFailure(): ConsumerControlPlaneFa
 
 private fun ActivationResidencyResult.Failure.toConsumerFailure(): ConsumerControlPlaneFailure = when (reason) {
     ActivationResidencyFailure.MODEL_CONFLICT ->
-        failure(ConsumerControlPlaneErrorCode.MODEL_CONFLICT, "Another active use case protects a different local model")
+        failure(ConsumerControlPlaneErrorCode.MODEL_CONFLICT, "Another active use case protects a different local model profile")
 
     ActivationResidencyFailure.USE_CASE_ALREADY_ACTIVE ->
         failure(ConsumerControlPlaneErrorCode.ACTIVATION_ALREADY_ACTIVE, "Use case is already active for this connection")

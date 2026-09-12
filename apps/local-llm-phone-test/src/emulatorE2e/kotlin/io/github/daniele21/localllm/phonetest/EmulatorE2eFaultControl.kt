@@ -33,9 +33,26 @@ internal class HarnessEmulatorE2eShellBridgeReceiver : BroadcastReceiver() {
             resultData = "unsupported"
             return
         }
-        val result = EmulatorE2eFaultCommandHandler.handle(context, intent)
-        resultCode = result.code
-        resultData = result.data
+
+        val pendingResult = goAsync()
+        val applicationContext = context.applicationContext
+        val command = Intent(intent)
+        Thread(
+            {
+                val result = runCatching {
+                    EmulatorE2eFaultCommandHandler.handle(applicationContext, command)
+                }.getOrElse { error ->
+                    EmulatorE2eFaultCommandResult(
+                        Activity.RESULT_CANCELED,
+                        "command_failed:${error.javaClass.simpleName}",
+                    )
+                }
+                pendingResult.setResultCode(result.code)
+                pendingResult.setResultData(result.data)
+                pendingResult.finish()
+            },
+            "harnex-emulator-e2e-shell",
+        ).start()
     }
 }
 

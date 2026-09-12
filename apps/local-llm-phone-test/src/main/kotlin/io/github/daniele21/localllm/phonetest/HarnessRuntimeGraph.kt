@@ -184,9 +184,16 @@ internal class HarnessRuntimeGraph private constructor(context: Context) : AutoC
                 }
             }
         val fallbackPolicyRegistry = InMemoryConsumerUseCasePolicyRegistry(policies)
+        val configuredProfileResolver = HarnessConfiguredConsumerProfileResolver(
+            store = controlPlaneStoreOwner.store,
+            modelStore = modelStore,
+        )
         val capabilityPolicy =
             ConsumerCapabilityPolicyService(
-                profileRegistry = registry,
+                profileRegistry = HarnessConsumerCapabilityProfileRegistry(
+                    activeBindings = registry,
+                    configuredResolver = configuredProfileResolver::resolve,
+                ),
                 modelStore = modelStore,
                 policyRegistry = HarnessActivationAwareConsumerPolicyRegistry(
                     applicationId = applicationId,

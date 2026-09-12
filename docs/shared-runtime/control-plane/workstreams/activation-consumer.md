@@ -5,7 +5,7 @@ Document type: feature-specification
 Owner: shared-runtime-control-plane
 Canonical scope: shared-runtime.control-plane.activation-consumer
 Read when: implementing activation leases, lease-aware model residency, assigned-use-case/preset discovery, Binder evolution or final hardcoded-binding cutover
-Last reviewed: 2026-08-18
+Last reviewed: 2026-09-11
 
 This workstream owns HCP-17 through HCP-21 and HCP-27. It extends the accepted Consumer API without exposing exact model identity or weakening the same-signer Binder trust boundary.
 
@@ -13,7 +13,7 @@ This workstream owns HCP-17 through HCP-21 and HCP-27. It extends the accepted C
 
 Dependencies: HCP-9 for final resolver integration; pure contract/test work may begin after HCP-0.
 
-Represent product-level local-AI activity with an activation identity distinct from runtime session identity. An activation pins authenticated application, use case, preset revision, binding revision and resolved model identity. One activation may own multiple stateless sessions over time.
+Represent product-level local-AI activity with an activation identity distinct from runtime session identity. An activation pins authenticated application, use case, preset revision, binding revision and exact resolved model-profile identity. One activation may own multiple stateless sessions over time.
 
 Explicit deactivate and Binder/client process death release owned activations idempotently. Ownership is isolated per authenticated connection/application.
 
@@ -23,11 +23,11 @@ Exit gate: "Local AI active" has an explicit host resource owner rather than bei
 
 Dependencies: HCP-17 and the deterministic resolved target from HCP-9.
 
-Normal unload is forbidden while a compatible active lease protects the resident model. After the final lease releases, the resolved Harness warm-retention policy starts. Replace the phone service's single hardcoded Binder-demand TTL with resolved policy semantics.
+Normal unload is forbidden while a compatible active lease protects the resident model profile identified by `(modelDigest, modelProfileId)`. A lease for another profile that happens to use the same artifact digest does not protect a stale resident profile. After the final compatible lease releases, the resolved Harness warm-retention policy starts. Replace the phone service's single hardcoded Binder-demand TTL with resolved policy semantics.
 
-Multiple leases may share the same resident model. While the one-resident-model invariant applies, an activation requesting a different model fails explicitly when the current model has protected leases; there is no silent preemption. Critical memory pressure may revoke/evict only under explicit policy and must emit typed runtime failure, telemetry and decision evidence.
+Multiple leases may share the same exact resident model profile. While the one-resident-model invariant applies, an activation requesting a different model profile fails explicitly when the current profile has protected leases; there is no silent preemption. Different profile identity includes the same digest with a different profile ID. Once the prior profile's final lease is released, a new activation may switch from that idle resident profile to its own resolved profile normally. Critical memory pressure may revoke/evict only under explicit policy and must emit typed runtime failure, telemetry and decision evidence.
 
-Exit gate: a consumer can remain active across sessions/idle gaps without losing its model to normal warm-idle logic.
+Exit gate: a consumer can remain active across sessions/idle gaps without losing its model profile to normal warm-idle logic, while a later distinct profile can replace an idle resident after prior demand releases.
 
 ## HCP-19 — Assigned use-case discovery
 
@@ -77,15 +77,16 @@ RedactGuard owns only its Consumer SDK adaptation: tolerate one/many published p
 | multiple suggested/custom presets | only exposed published safe metadata is visible |
 | custom preset withdrawn | stale selection refreshes/fails explicitly |
 | no app/use-case binding | actionable configuration failure |
-| activation active, zero sessions | protected model stays resident |
+| activation active, zero sessions | protected exact model profile stays resident |
 | last activation released | configured warm retention starts |
 | warm retention expires | unload with explicit reason |
-| two apps, same model | compatible leases coexist |
-| different-model request while protected | explicit conflict; no silent preemption |
+| two apps, same exact model profile | compatible leases coexist |
+| different-model-profile request while protected | explicit conflict; no silent preemption |
+| same digest, prior profile released, new profile activated | idle prior profile may unload and the new profile may load |
 | Binder/process death | requests/sessions/activation clean idempotently |
 | critical memory pressure | explicit revoke/eviction policy and evidence |
 | preset edited while active | current activation remains pinned; next activation sees new revision |
 | Harness restart | consumer reconnects, rediscovers and reactivates |
 | prompt/output privacy | no sensitive content in telemetry/decision/notification evidence |
 
-Representative physical two-APK evidence is required for activation/residency/process-death claims and must bind exact host/client/runtime/model/preset/device identity.
+Representative physical two-APK evidence is required for activation/residency/process-death claims and must bind exact host/client/runtime/model-profile/preset/device identity.

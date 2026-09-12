@@ -4,11 +4,11 @@ import io.github.daniele21.localllm.models.GgufModelProfile
 
 /**
  * Shared-runtime backend decorator that makes activation leases authoritative at the physical
- * model-release boundary. It deliberately delegates every operation except model unload.
+ * model-profile boundary. It deliberately delegates every operation except model unload.
  *
  * RuntimeOrchestrator already restores RESIDENT state when backend unload fails, so rejecting the
- * physical release here prevents an ordinary idle/switch path from evicting a model protected by
- * an active activation without duplicating model-handle ownership.
+ * physical release here prevents an ordinary idle/switch path from evicting a model profile
+ * protected by an active activation without duplicating model-handle ownership.
  */
 class ActivationResidencyInferenceBackend(
     private val delegate: InferenceBackend,
@@ -27,10 +27,10 @@ class ActivationResidencyInferenceBackend(
     override fun loadModel(source: BackendModelSource, profile: GgufModelProfile): BackendModelHandle = delegate.loadModel(source, profile)
 
     override fun unloadModel(model: BackendModelHandle) {
-        if (activationResidency.protects(model.digest)) {
+        if (activationResidency.protectsModelProfile(model.digest, model.profileId)) {
             throw BackendException(
                 code = MODEL_PROTECTED_CODE,
-                message = "Model ${model.digest.sha256} is protected by an active use-case activation",
+                message = "Model profile ${model.profileId} (${model.digest.sha256}) is protected by an active use-case activation",
             )
         }
         delegate.unloadModel(model)

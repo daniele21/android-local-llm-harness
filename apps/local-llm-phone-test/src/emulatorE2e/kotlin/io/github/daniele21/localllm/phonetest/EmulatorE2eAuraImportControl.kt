@@ -73,7 +73,19 @@ internal object EmulatorE2eAuraImportControl {
                     ?: error("Aura assignment is unavailable for ${useCaseId.value}")
                 if (latest.enabled == enabled) return@transact current
 
-                val next = latest.copy(revision = latest.revision + 1, enabled = enabled)
+                val anotherCurrentDefaultExists = current.currentBindings(latest.applicationId).any { binding ->
+                    binding.useCaseId != useCaseId && binding.isDefault
+                }
+                val nextIsDefault = enabled &&
+                    (
+                        latest.isDefault ||
+                            (useCaseId == HarnessSharedRuntimeBindings.auraSchemaInferenceUseCaseId && !anotherCurrentDefaultExists)
+                        )
+                val next = latest.copy(
+                    revision = latest.revision + 1,
+                    enabled = enabled,
+                    isDefault = nextIsDefault,
+                )
                 val nextExposures = current.exposures
                     .filter {
                         it.bindingId == latest.bindingId &&

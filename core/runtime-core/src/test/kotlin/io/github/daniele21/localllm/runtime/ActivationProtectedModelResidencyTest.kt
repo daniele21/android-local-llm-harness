@@ -55,6 +55,7 @@ class ActivationProtectedModelResidencyTest {
         useCaseId = UseCaseId("document-pii-detection"),
         preset = InferencePresetRef(InferencePresetId("balanced"), 3),
         modelDigest = digest,
+        modelProfileId = "profile-a",
         acquiredAtEpochMs = 1_000,
         useCaseRevision = 2,
         bindingRevision = 7,

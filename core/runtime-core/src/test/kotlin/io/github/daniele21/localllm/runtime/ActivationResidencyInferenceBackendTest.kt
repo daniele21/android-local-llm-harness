@@ -15,12 +15,12 @@ class ActivationResidencyInferenceBackendTest {
     private val digest = ModelDigest("d".repeat(64))
 
     @Test
-    fun `protected activation rejects physical backend unload`() {
+    fun `matching protected activation rejects physical backend unload`() {
         val coordinator = coordinator()
         val delegate = RecordingBackend()
         val backend = ActivationResidencyInferenceBackend(delegate, coordinator)
-        val handle = ResidencyBackendTestModelHandle(digest)
-        coordinator.acquire(request(), retainModelWarmMs = 30_000)
+        val handle = ResidencyBackendTestModelHandle(digest, PROFILE_A)
+        coordinator.acquire(request(PROFILE_A), retainModelWarmMs = 30_000)
 
         val failure = runCatching { backend.unloadModel(handle) }.exceptionOrNull()
 
@@ -30,12 +30,25 @@ class ActivationResidencyInferenceBackendTest {
     }
 
     @Test
+    fun `same digest activation for another profile allows stale profile unload`() {
+        val coordinator = coordinator()
+        val delegate = RecordingBackend()
+        val backend = ActivationResidencyInferenceBackend(delegate, coordinator)
+        val staleHandle = ResidencyBackendTestModelHandle(digest, PROFILE_A)
+        coordinator.acquire(request(PROFILE_B), retainModelWarmMs = 30_000)
+
+        backend.unloadModel(staleHandle)
+
+        assertTrue(delegate.unloaded)
+    }
+
+    @Test
     fun `final release allows physical backend unload`() {
         val coordinator = coordinator()
         val delegate = RecordingBackend()
         val backend = ActivationResidencyInferenceBackend(delegate, coordinator)
-        val handle = ResidencyBackendTestModelHandle(digest)
-        val acquired = coordinator.acquire(request(), retainModelWarmMs = 30_000) as ActivationResidencyResult.Success
+        val handle = ResidencyBackendTestModelHandle(digest, PROFILE_A)
+        val acquired = coordinator.acquire(request(PROFILE_A), retainModelWarmMs = 30_000) as ActivationResidencyResult.Success
         coordinator.release(acquired.value.activationId, acquired.value.ownerId)
 
         backend.unloadModel(handle)
@@ -47,21 +60,27 @@ class ActivationResidencyInferenceBackendTest {
         UseCaseActivationLeaseRegistry(ActivationIdFactory { UseCaseActivationId("activation-1") }),
     )
 
-    private fun request(): UseCaseActivationRequest = UseCaseActivationRequest(
+    private fun request(modelProfileId: String): UseCaseActivationRequest = UseCaseActivationRequest(
         ownerId = ActivationOwnerId("owner-a"),
         applicationId = ApplicationId("redactguard"),
         useCaseId = UseCaseId("document-pii-detection"),
         preset = InferencePresetRef(InferencePresetId("balanced"), 3),
         modelDigest = digest,
+        modelProfileId = modelProfileId,
         acquiredAtEpochMs = 1_000,
         useCaseRevision = 2,
         bindingRevision = 7,
     )
+
+    private companion object {
+        const val PROFILE_A = "profile-a"
+        const val PROFILE_B = "profile-b"
+    }
 }
 
 private data class ResidencyBackendTestModelHandle(
     override val digest: ModelDigest,
-    override val profileId: String = "profile-a",
+    override val profileId: String,
     override val loadDurationMs: Long = 1,
 ) : BackendModelHandle
 

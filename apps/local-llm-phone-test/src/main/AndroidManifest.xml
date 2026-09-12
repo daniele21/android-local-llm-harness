@@ -7,6 +7,8 @@
     <queries>
         <package android:name="io.github.daniele21.redactguard" />
         <package android:name="io.github.daniele21.redactguard.debug" />
+        <package android:name="com.staituned.aura" />
+        <package android:name="com.staituned.aura.debug" />
     </queries>
 
     <application
